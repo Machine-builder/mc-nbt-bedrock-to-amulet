@@ -27,13 +27,15 @@ def search_for_multisubstring(s,substrings=[],return_min=True):
         if substring in s:
             indices.append(s.index(substring))
     try: return (min(indices) if return_min else indices)
-    except: return -1
+    except: return len(s)+2
 
 def bedrock_nbt_to_universal_nbt(bedrock_nbt_string):
     '''recursively convert bedrock nbt into universal nbt'''
 
+    # copy the bedrock_nbt_string variable to bnbts
     bnbts = bedrock_nbt_string
 
+    # if there is no tag type starter, assume it's a compound
     if bnbts.startswith('[') and bnbts.endswith(']'):
         bnbts = 'TAG_Compound-properties:'+bnbts
 
@@ -43,14 +45,11 @@ def bedrock_nbt_to_universal_nbt(bedrock_nbt_string):
     # track open brackets to find tag indices within layer 0 of recursion
     ob = 0
     for text_position,character in enumerate(bnbts):
-        if character == '[':
-            ob += 1
-        elif character == ']':
-            ob -= 1
+        if character == '[': ob += 1
+        elif character == ']': ob -= 1
         if ob == 0:
             left_over = bnbts[text_position:]
-            if left_over.startswith('TAG_'):
-                tags_indices.append(text_position)
+            if left_over.startswith('TAG_'): tags_indices.append(text_position)
 
     # temporary nbt data storage
     output_data = []
@@ -73,6 +72,7 @@ def bedrock_nbt_to_universal_nbt(bedrock_nbt_string):
         # get the content of the tag
         rtt = real_tag_type.lower()
         tag_content = None
+
         if rtt in ['int', 'byte', 'short']:
             addtable = {
                 'int': '',
@@ -120,13 +120,58 @@ def bedrock_nbt_to_universal_nbt(bedrock_nbt_string):
                 inside_data += character
             tag_content = bedrock_nbt_to_universal_nbt( inside_data )
 
+        # save the data
         output_data.append([real_tag_type,real_tag_name,tag_content])
     
     return output_data
 
-def universal_nbt_to_amulet_nbt(universal_nbt):
+'''
+
+compound is {}
+list is []
+int is 1
+byte is 1b
+short is 1s
+string is "1"
+
+'''
+
+def universal_nbt_to_amulet_nbt(universal_nbt,is_list=False):
     '''recursively convert universal nbt into amulet nbt'''
-    pass
+    
+    # store the final string
+    final_string = ''
+
+    for datatagindex, datatag in enumerate( universal_nbt ):
+        tag_type, tag_name, tag_content = datatag
+        
+        # check if this is the last tag, if it is, don't put a comma after it
+        is_last_tag = not datatagindex < len(universal_nbt)-1
+
+        if tag_name!='' and not is_list:
+            final_string += tag_name+': '
+
+        if tag_type == 'Int':
+            final_string += str(tag_content)
+
+        if tag_type == 'Byte':
+            final_string += str(tag_content)
+
+        if tag_type == 'Short':
+            final_string += str(tag_content)
+
+        if tag_type == 'String':
+            final_string += str(tag_content)
+
+        if tag_type == 'Compound':
+            final_string += '{' + universal_nbt_to_amulet_nbt( tag_content ) + '}'
+
+        if tag_type == 'List':
+            final_string += '[' + universal_nbt_to_amulet_nbt( tag_content, is_list=True ) + ']'
+
+        final_string += (', ' if not is_last_tag else '')
+
+    return final_string
 
 import json
 
@@ -152,6 +197,11 @@ class BedrockNBT():
 
         univ_nbt = bedrock_nbt_to_universal_nbt( new )
         represent_tags( univ_nbt )
+
+        amulet_nbt = universal_nbt_to_amulet_nbt( univ_nbt )
+        print("AMULET-NBT")
+        print(amulet_nbt)
+        print()
 
 '''
 TAG_Compound-:[
@@ -193,3 +243,11 @@ Items
 id
 isMovable
 '''
+
+if __name__ == '__main__':
+    print("RUNNING TEST")
+    bedrocknbtx = '[TAG_Int-facing_direction:4]'
+    print(bedrocknbtx)
+
+    r = BedrockNBT( bedrocknbtx )
+    r.into_amulet_nbt()
