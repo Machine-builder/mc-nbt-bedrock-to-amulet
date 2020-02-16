@@ -20,6 +20,7 @@ string is "1"
 '''
 
 import re
+import amulet_nbt.amulet_py_nbt as pynbt
 
 def search_for_multisubstring(s,substrings=[],return_min=True):
     indices = []
@@ -73,11 +74,12 @@ def bedrock_nbt_to_universal_nbt(bedrock_nbt_string):
         rtt = real_tag_type.lower()
         tag_content = None
 
-        if rtt in ['int', 'byte', 'short']:
+        if rtt in ['int', 'byte', 'short', 'float']:
             addtable = {
                 'int': '',
                 'byte': 'b',
-                'short': 's'
+                'short': 's',
+                'float': 'f'
             }
             # the tag is a number of sorts
             after_tag_section = after_tag_bit[name_after_tag_index+1:]
@@ -136,11 +138,14 @@ string is "1"
 
 '''
 
-def universal_nbt_to_amulet_nbt(universal_nbt,is_list=False):
+def universal_nbt_to_amulet_nbt(universal_nbt,is_list=False,quote_names=False):
     '''recursively convert universal nbt into amulet nbt'''
     
     # store the final string
     final_string = ''
+
+    quote_str = '"' if quote_names else ''
+    print(quote_names, quote_str)
 
     for datatagindex, datatag in enumerate( universal_nbt ):
         tag_type, tag_name, tag_content = datatag
@@ -149,7 +154,7 @@ def universal_nbt_to_amulet_nbt(universal_nbt,is_list=False):
         is_last_tag = not datatagindex < len(universal_nbt)-1
 
         if tag_name!='' and not is_list:
-            final_string += tag_name+': '
+            final_string += quote_str+tag_name+quote_str+': '
 
         if tag_type == 'Int':
             final_string += str(tag_content)
@@ -160,20 +165,21 @@ def universal_nbt_to_amulet_nbt(universal_nbt,is_list=False):
         if tag_type == 'Short':
             final_string += str(tag_content)
 
+        if tag_type == 'Float':
+            final_string += str(tag_content)
+
         if tag_type == 'String':
             final_string += str(tag_content)
 
         if tag_type == 'Compound':
-            final_string += '{' + universal_nbt_to_amulet_nbt( tag_content ) + '}'
+            final_string += '{' + universal_nbt_to_amulet_nbt( tag_content, quote_names=quote_names ) + '}'
 
         if tag_type == 'List':
-            final_string += '[' + universal_nbt_to_amulet_nbt( tag_content, is_list=True ) + ']'
+            final_string += '[' + universal_nbt_to_amulet_nbt( tag_content, is_list=True, quote_names=quote_names ) + ']'
 
         final_string += (', ' if not is_last_tag else '')
 
     return final_string
-
-import json
 
 def represent_tags(data, recursion_level = 1):
     for dat in data:
@@ -188,20 +194,21 @@ class BedrockNBT():
         self.rawnbt = nbt
         self.strnbt = str(nbt)
 
-    def into_amulet_nbt(self):
+    def into_amulet_nbt(self, quote_names=False):
         '''turn the current bedrock nbt data into amulet nbt data'''
 
-        # record the string of operation, for debugging
-        new = self.strnbt
-        open("ian_step1.txt", 'w').write(new)
+        nbt_copy = self.strnbt
 
-        univ_nbt = bedrock_nbt_to_universal_nbt( new )
-        represent_tags( univ_nbt )
+        univ_nbt = bedrock_nbt_to_universal_nbt( nbt_copy )
+        # represent_tags( univ_nbt )
 
-        amulet_nbt = universal_nbt_to_amulet_nbt( univ_nbt )
-        print("AMULET-NBT")
-        print(amulet_nbt)
-        print()
+        amulet_nbt = universal_nbt_to_amulet_nbt( univ_nbt, quote_names=quote_names )
+        return amulet_nbt
+
+def BedrockNBTtoAmuletNBT(bedrockNBTstr, quote_names=False):
+    '''convert a Bedrock NBT string into an amulet-nbt compatible string'''
+    amuletNBTstr = BedrockNBT( bedrockNBTstr ).into_amulet_nbt(quote_names=quote_names)
+    return amuletNBTstr
 
 '''
 TAG_Compound-:[
