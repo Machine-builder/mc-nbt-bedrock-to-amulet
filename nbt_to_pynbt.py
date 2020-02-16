@@ -19,14 +19,23 @@ with bedrock.World("C:\\Users\\josh\\AppData\\Local\\Packages\\Microsoft.Minecra
     print("nbt type :", type(bnbt))
     print("properties type :", type(props))
 
-    if bnbt:
-        dat = bnbt
-    else:
-        dat = props
-    
+    if bnbt: dat = bnbt
+    else: dat = props
     sdat = str(dat)
     open('f_decoded_world_block.txt', 'w').write(sdat)
 
-    newnbt = nbtformat.BedrockNBT( dat )
+    if bnbt:
+        print("NBT -")
+        print(bnbt)
+        print("program out :")
 
-    newnbt.into_amulet_nbt()
+        NBTDATA = nbtformat.BedrockNBT( bnbt )
+        NBTDATA.into_amulet_nbt()
+    
+    if props:
+        print("PROPERTIES -")
+        print(props)
+        print("program out :")
+
+        PROPERTIESDATA = nbtformat.BedrockNBT( props )
+        PROPERTIESDATA.into_amulet_nbt()

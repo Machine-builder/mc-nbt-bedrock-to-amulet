@@ -26,31 +26,38 @@ def search_for_multisubstring(s,substrings=[],return_min=True):
     for substring in substrings:
         if substring in s:
             indices.append(s.index(substring))
-    return (min(indices) if return_min else indices)
+    try: return (min(indices) if return_min else indices)
+    except: return -1
 
-class TAG():
-    def __init__(self, tag_type, payload):
-        self.type = tag_type
-        self.payload = payload
-
-def bedrock_nbt_to_amulet_nbt(bedrock_nbt_string):
-    '''recursively convert bedrock nbt into amulet-nbt'''
+def bedrock_nbt_to_universal_nbt(bedrock_nbt_string):
+    '''recursively convert bedrock nbt into universal nbt'''
 
     bnbts = bedrock_nbt_string
 
+    if bnbts.startswith('[') and bnbts.endswith(']'):
+        bnbts = 'TAG_Compound-properties:'+bnbts
+
     # check how many tags there are, and then find the index of all of them
-    tagsc = bnbts.count("TAG_")
-    tags_indices = [m.start() for m in re.finditer('TAG_', bnbts)]
-    
-    # debug messages
-    print("Amount of tags :", tagsc)
-    print("Tags found :", len(tags_indices))
+    tags_indices = []
+
+    # track open brackets to find tag indices within layer 0 of recursion
+    ob = 0
+    for text_position,character in enumerate(bnbts):
+        if character == '[':
+            ob += 1
+        elif character == ']':
+            ob -= 1
+        if ob == 0:
+            left_over = bnbts[text_position:]
+            if left_over.startswith('TAG_'):
+                tags_indices.append(text_position)
 
     # temporary nbt data storage
-    output_data = {  }
+    output_data = []
 
     # loop through every tag index that was found earlier with regex
     for tag_index in tags_indices:
+
         # get the text after the tag index
         after_tag_bit = bnbts[tag_index:]
         # get the index of the end of the tag id
@@ -85,7 +92,6 @@ def bedrock_nbt_to_amulet_nbt(bedrock_nbt_string):
 
         if rtt == 'compound':
             # the tag is type compound
-            # TODO : read and count open and closed brackets to work out what data is 'inside' this set
             inside_data = ''
             after_tag_section = after_tag_bit[name_after_tag_index+2:]
             open_brackets = 1
@@ -97,11 +103,39 @@ def bedrock_nbt_to_amulet_nbt(bedrock_nbt_string):
                     if open_brackets == 0:
                         break
                 inside_data += character
-            tag_content = inside_data
+            tag_content = bedrock_nbt_to_universal_nbt( inside_data )
 
-        print(real_tag_type.ljust(9), '::', real_tag_name.ljust(10), '>>', tag_content)
-        # output_data[real_tag_name]
+        if rtt == 'list':
+            # the tag is type list
+            inside_data = ''
+            after_tag_section = after_tag_bit[name_after_tag_index+2:]
+            open_brackets = 1
+            for character in after_tag_section:
+                if character == '[':
+                    open_brackets += 1
+                if character == ']':
+                    open_brackets -= 1
+                    if open_brackets == 0:
+                        break
+                inside_data += character
+            tag_content = bedrock_nbt_to_universal_nbt( inside_data )
 
+        output_data.append([real_tag_type,real_tag_name,tag_content])
+    
+    return output_data
+
+def universal_nbt_to_amulet_nbt(universal_nbt):
+    '''recursively convert universal nbt into amulet nbt'''
+    pass
+
+import json
+
+def represent_tags(data, recursion_level = 1):
+    for dat in data:
+        tt,tn,tc = dat # tag type, tag name, tag content
+        print("   "*recursion_level, "TAG_"+str(tt).title()+'-'+str(tn))
+        if type(tc)==list:
+            represent_tags(tc,recursion_level+1)
 
 class BedrockNBT():
     '''A class designed to read nbt data from Bedrock and convert it to be used with Amulet-NBT'''
@@ -116,4 +150,46 @@ class BedrockNBT():
         new = self.strnbt
         open("ian_step1.txt", 'w').write(new)
 
-        bedrock_nbt_to_amulet_nbt( new )
+        univ_nbt = bedrock_nbt_to_universal_nbt( new )
+        represent_tags( univ_nbt )
+
+'''
+TAG_Compound-:[
+  TAG_Byte-Findable:0,
+  TAG_List-Items:[
+    TAG_Compound-0:[
+      TAG_Byte-Count:1,
+      TAG_Short-Damage:0,
+      TAG_String-Name:minecraft:stone_sword,
+      TAG_Byte-Slot:0, 
+      TAG_Compound-tag:[
+        TAG_Int-Damage:0,
+        TAG_List-ench:[
+          TAG_Compound-0:[
+            TAG_Short-id:9,
+            TAG_Short-lvl:2
+          ]
+        ]
+      ]
+    ]
+  ],
+  TAG_String-id:Chest,
+  TAG_Byte-isMovable:1
+]
+
+Findable
+Items
+    0
+        Count
+        Damage
+        Name
+        Slot
+        tag
+        Damage
+        ench
+            0
+                id
+                lvl
+id
+isMovable
+'''
